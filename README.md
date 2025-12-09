@@ -2,29 +2,59 @@
 - [ggswitzerland](#ggswitzerland)
   - [`theme_map()`](#theme_map)
   - [data prep](#data-prep)
+    - [we need to include it in the
+      package](#we-need-to-include-it-in-the-package)
   - [`stamp_mountains()`](#stamp_mountains)
   - [`geom_*()` and `stamp_*()` functions using
     `ggregions::write_*(ref_data = ?)`](#geom_-and-stamp_-functions-using-ggregionswrite_ref_data--)
-- [Use ggswitzerland functions: a
-  replication](#use-ggswitzerland-functions-a-replication)
+- [packaging](#packaging)
+- [Use ggswitzerland! A replication of Timo’s
+  work](#use-ggswitzerland-a-replication-of-timos-work)
+  - [A little more styling](#a-little-more-styling)
 - [Bonus: {ggswitzerland} X
   {ggincerta}](#bonus-ggswitzerland-x-ggincerta)
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-``` r
-library(tidyverse)
-```
-
-``` r
-library(sf)
-```
-
 # ggswitzerland
+
+Is inspired and uses much of the code in ‘[Bivariate maps with ggplot2
+and
+sf](https://timogrossenbacher.ch/bivariate-maps-with-ggplot2-and-sf/)’
+with the source available in the
+[repo](https://github.com/grssnbchr/bivariate-maps-ggplot2-sf?tab=readme-ov-file).
+
+The main goal is to be able to more succinctly create the following
+plot, using new layers (`geom_*()` and `stamp_*()` functions) that are
+defined in {ggswitzerland}. An original plot (not bivariate) from the
+blogpost:
+
+![](https://timogrossenbacher.ch/content/images/size/w1000/2023/07/bm-thematic-univariate-map-1.png)
+The novel functionality in {ggswitzerland} is `geom_muni()` which can be
+used to create a map from flat data (no boundary information). Creating
+functions like `geom_muni()` can be done easily using the {ggregions}
+package.
+
+``` r
+flat_income_data |> # no boundary data is included
+  ggplot() +
+  aes(muni_name = municipality,
+      fill = income_levels) + 
+  geom_muni()     # knows municipality boundaries
+```
+
+Annotation layers `stamp_relief()` (and alias `stamp_mountains()`) as
+well as `stamp_lake()` and `stamp_canton()` are also specified to allow
+the map to be fully reproduced.
 
 ## `theme_map()`
 
+This pretty much verbatim from the blog, but *does* add palette
+definition, which is new in ggplot2 4.0.0. We go with magma since it
+looks great in the target plot and is colorblind friendly!
+
 ``` r
+#' @export
 theme_map <- function(...) {
   theme_minimal() +
   theme(
@@ -75,9 +105,11 @@ theme_map <- function(...) {
 
 ## data prep
 
-Various geodata from the Swiss Federal Statistical Office (FSO) and the
-Swiss Federal Office of Topography (swisstopo) depicting Swiss borders
-as of 2015 are used herein.
+Here’s some info about the data provinance, also from the blog.
+
+> Various geodata from the Swiss Federal Statistical Office (FSO) and
+> the Swiss Federal Office of Topography (swisstopo) depicting Swiss
+> borders as of 2015 are used herein.
 
 - `input/gde-1-1-15.*`: These geometries do not show the political
   borders of Swiss municipalities, but the so-called “productive” area,
@@ -104,19 +136,21 @@ as of 2015 are used herein.
   need of explicitly installing the `rgdal` package – which is not the
   case for GeoTIFF files.
 
+Now data prep that is appropriate for the ggregions methodology.
+
 ``` r
 library(tidyverse)
 # read cantonal borders
 canton_geo <- read_sf("input/g2k15.shp") |>
-  dplyr::select(canton_name = KTNAME, canton_num = KTNR, geometry)
+  dplyr::select(canton_name = KTNAME, canton_num = KTNR)
 
 # read country borders
 country_geo <- read_sf("input/g2l15.shp") |> 
-  dplyr::select(iso_chr = CH_ISO, geometry)
+  dplyr::select(iso_chr = CH_ISO)
 
 # read lakes
 lake_geo <- read_sf("input/g2s15.shp") |>
-  dplyr::select(lake_name = GMDNAME, lake_num = GMDNR, geometry)
+  dplyr::select(lake_name = GMDNAME, lake_num = GMDNR)
 
 
 # read productive area (2324 municipalities)
@@ -130,13 +164,21 @@ relief <- raster("input/02-relief-ascii.asc") %>%
   mask(country_geo) %>%
   as("SpatialPixelsDataFrame") %>%
   as.data.frame() %>%
-  dplyr::rename(value = `X02.relief.ascii`)
+  dplyr::rename(value = `X02.relief.ascii`) |> 
+  mutate(value_01 = (value - min(value))) |>
+  mutate(value_01 = value_01/max(value_01)) |>
+  mutate(value_point6_0 = value_01 * .6) |>
+  mutate(value_point6_0 = 1 - value_point6_0 - .4)
+```
 
-relief <- relief |> 
-    mutate(value_01 = (value - min(value))) |>
-    mutate(value_01 = value_01/max(value_01)) |>
-    mutate(value_point6_0 = value_01 * .6) |>
-    mutate(value_point6_0 = 1 - value_point6_0 - .4)
+### we need to include it in the package
+
+``` r
+usethis::use_data(relief, overwrite = T)
+usethis::use_data(canton_geo, overwrite = T)
+usethis::use_data(country_geo, overwrite = T)
+usethis::use_data(lake_geo, overwrite = T)
+usethis::use_data(muni_prod_geo, overwrite = T)
 ```
 
 ## `stamp_mountains()`
@@ -159,6 +201,12 @@ stamp_mountains <- stamp_relief
 
 ## `geom_*()` and `stamp_*()` functions using `ggregions::write_*(ref_data = ?)`
 
+Install {ggregions} if you don’t already have the package.
+
+``` r
+remotes::install_github("EvaMaeRey/ggregions")
+```
+
 ``` r
 #' @export
 geom_muni <- ggregions::write_geom_region_locale(ref_data = muni_prod_geo)
@@ -170,18 +218,28 @@ stamp_canton <- ggregions::write_stamp_region_locale(canton_geo)
 stamp_lake <- ggregions::write_stamp_region_locale(lake_geo)
 ```
 
-# Use ggswitzerland functions: a replication
+# packaging
 
 ``` r
+knitrExtra::chunk_to_dir(
+  c("stamp_mountains", 
+    "geom_regions_functions",
+    "theme_map")
+  )
+```
+
+``` r
+devtools::document(".")
+devtools::check(".")
+devtools::install(".", upgrade = "never")
+```
+
+# Use ggswitzerland! A replication of Timo’s work
+
+``` r
+remove(list = ls())
+
 data <- readr::read_csv("input/data.csv")
-#> Rows: 2324 Columns: 4
-#> ── Column specification ────────────────────────────────────────────────────────
-#> Delimiter: ","
-#> chr (1): municipality
-#> dbl (3): bfs_id, mean, gini
-#> 
-#> ℹ Use `spec()` to retrieve the full column specification for this data.
-#> ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
 
 head(data)
 #> # A tibble: 6 × 4
@@ -203,9 +261,8 @@ no_classes <- 6
 # extract quantiles
 quantiles <- data %>%
   pull(mean) %>%
-  quantile(probs = seq(0, 1, length.out = no_classes + 1)) %>%
+  quantile(probs = seq(0, 1, length.out = 6 + 1)) %>%
   as.vector() # to remove names of quantiles, so idx below is numeric
-
 
 # here we create custom labels
 labels <- imap_chr(quantiles, function(., idx){
@@ -222,7 +279,7 @@ labels <- labels[1:length(labels) - 1]
 
 data <- data |> 
   mutate(mean_quantiles = 
-           cut(mean,
+         cut(mean,
                breaks = quantiles,
                labels = labels,
                include.lowest = T))
@@ -241,14 +298,8 @@ data |> head()
 
 ``` r
 library(tidyverse)
-# library(ggswitzerland)
-
+library(ggswitzerland)
 theme_map() |> theme_set()
-#> Warning: The `size` argument of `element_line()` is deprecated as of ggplot2 3.4.0.
-#> ℹ Please use the `linewidth` argument instead.
-#> This warning is displayed once every 8 hours.
-#> Call `lifecycle::last_lifecycle_warnings()` to see where this warning was
-#> generated.
 
 data |> 
   ggplot() + 
@@ -258,17 +309,11 @@ data |>
   aes(fill = mean_quantiles) +
   stamp_canton(fill = "transparent") + 
   stamp_lake(fill = "#D6F1FF")
-#> Coordinate system already present.
-#> ℹ Adding new coordinate system, which will replace the existing one.
-#> Coordinate system already present.
-#> ℹ Adding new coordinate system, which will replace the existing one.
-#> Warning: More than one geometry column present: taking the first
-#> Joining with `by = join_by(muni_name)`
-#> Warning: More than one geometry column present: taking the first
-#> Warning: More than one geometry column present: taking the first
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
+<img src="README_files/figure-gfm/unnamed-chunk-8-1.png" width="100%" />
+
+## A little more styling
 
 ``` r
 default_caption <- paste0("Map CC-BY-SA; Code: ",
@@ -283,25 +328,19 @@ default_caption <- paste0("Map CC-BY-SA; Code: ",
 data |> 
   ggplot() + 
   stamp_mountains() + 
-  aes(muni_name = municipality,
-      fill = mean_quantiles) +
+  aes(muni_name = municipality) +
   geom_muni(alpha = .8, color = "lightgrey") +
+  aes(fill = mean_quantiles) +
   stamp_canton(fill = "transparent", 
                color = "whitesmoke", 
                linewidth = .5) + 
   stamp_lake(fill = "#D6F1FF", color = "transparent") + 
-  theme_map()
-#> Coordinate system already present.
-#> ℹ Adding new coordinate system, which will replace the existing one.
-#> Coordinate system already present.
-#> ℹ Adding new coordinate system, which will replace the existing one.
-#> Warning: More than one geometry column present: taking the first
-#> Joining with `by = join_by(muni_name)`
-#> Warning: More than one geometry column present: taking the first
-#> More than one geometry column present: taking the first
+  theme_map() + 
+  scale_fill_viridis_d(begin = .1, end = .9,
+                       option = "magma")
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
+<img src="README_files/figure-gfm/unnamed-chunk-10-1.png" width="100%" />
 
 ``` r
 
@@ -312,13 +351,13 @@ last_plot() +
        subtitle = "Average yearly income in Swiss municipalities, 2015",
        caption = default_caption
        ) 
-#> Warning: More than one geometry column present: taking the first
-#> Joining with `by = join_by(muni_name)`
-#> Warning: More than one geometry column present: taking the first
-#> More than one geometry column present: taking the first
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-5-2.png)<!-- -->
+<img src="README_files/figure-gfm/unnamed-chunk-10-2.png" width="100%" />
+
+Original:
+
+![](https://timogrossenbacher.ch/content/images/size/w1000/2023/07/bm-thematic-univariate-map-1.png)
 
 ------------------------------------------------------------------------
 
@@ -333,22 +372,18 @@ data |>
   aes(muni_name = municipality) +
   geom_muni() + 
   aes(fill = duo(gini, mean))
-#> Warning: More than one geometry column present: taking the first
-#> Joining with `by = join_by(muni_name)`
-#> Warning: More than one geometry column present: taking the first
-#> More than one geometry column present: taking the first
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
+<img src="README_files/figure-gfm/unnamed-chunk-11-1.png" width="100%" />
 
 ``` r
 
 last_plot() + 
   scale_fill_bivariate(colors = c("darkred", "navy"))
-#> Warning: More than one geometry column present: taking the first
-#> Joining with `by = join_by(muni_name)`
-#> Warning: More than one geometry column present: taking the first
-#> More than one geometry column present: taking the first
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-6-2.png)<!-- -->
+<img src="README_files/figure-gfm/unnamed-chunk-11-2.png" width="100%" />
+
+Original:
+
+![](https://timogrossenbacher.ch/content/images/size/w1000/2023/07/bm-thematic-bivariate-map-with-legend-1.png)
