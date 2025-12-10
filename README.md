@@ -3,16 +3,22 @@
 - [Let’s go! Building {ggswitzerland}](#lets-go-building-ggswitzerland)
   - [`theme_map()`](#theme_map)
   - [data prep](#data-prep)
-    - [we need to include it in the
-      package](#we-need-to-include-it-in-the-package)
-  - [`stamp_mountains()`](#stamp_mountains)
+    - [Mountain data](#mountain-data)
+    - [we need to include each of our prepared datasets in the
+      package](#we-need-to-include-each-of-our-prepared-datasets-in-the-package)
   - [`geom_*()` and `stamp_*()` functions using
     `ggregions::write_*(ref_data = ?)`](#geom_-and-stamp_-functions-using-ggregionswrite_ref_data--)
+  - [`stamp_mountains()`](#stamp_mountains)
 - [packaging](#packaging)
-- [Use ggswitzerland! A replication of Timo and Angelo’s
-  work](#use-ggswitzerland-a-replication-of-timo-and-angelos-work)
-  - [Data preparation (binning)](#data-preparation-binning)
+  - [code management](#code-management)
+  - [Document, check, install minimal
+    package](#document-check-install-minimal-package)
+- [Use ggswitzerland! A replication of Timo and Angelo’s mapping work
+  (some data preparation that is demo-ed in the blog is saved in the
+  csv.)](#use-ggswitzerland-a-replication-of-timo-and-angelos-mapping-work-some-data-preparation-that-is-demo-ed-in-the-blog-is-saved-in-the-csv)
   - [Basic Vizzing](#basic-vizzing)
+    - [data to viz](#data-to-viz)
+    - [viz itself](#viz-itself)
   - [A little more styling and
     labels.](#a-little-more-styling-and-labels)
 - [Bonus: {ggswitzerland} X
@@ -70,9 +76,9 @@ Now it’s time to craft some functions!
 
 ## `theme_map()`
 
-This pretty much verbatim from the blog, but *does* add palette
-definition, which is new in ggplot2 4.0.0. We go with magma since it
-looks great in the target plot and is colorblind friendly!
+This is pretty much verbatim from Timo and Angelo’s blog, but *does* add
+palette definitions, a capability new in ggplot2 4.0.0. We use ‘magma’
+since it looks great in the target plot and is colorblind friendly!
 
 ``` r
 #' @export
@@ -126,38 +132,36 @@ theme_map <- function(...) {
 
 ## data prep
 
-Here’s some info about the data provinance, also from the blog.
+Here’s some info about the data provinance, verbatim from the blog.
 
 > Various geodata from the Swiss Federal Statistical Office (FSO) and
 > the Swiss Federal Office of Topography (swisstopo) depicting Swiss
 > borders as of 2015 are used herein.
 
-- `input/gde-1-1-15.*`: These geometries do not show the political
-  borders of Swiss municipalities, but the so-called “productive” area,
-  i.e., larger lakes and other “unproductive” areas such as mountains
-  are excluded. This has two advantages: 1) The relatively sparsely
-  populated but very large municipalities in the Alps don’t have too
-  much visual weight and 2) it allows us to use the beautiful raster
-  relief of the Alps as a background. These data are now freely
-  available [from the
-  FSO](https://www.bfs.admin.ch/bfs/en/home/statistics/regional-statistics/base-maps/cartographic-bases.assetdetail.7546178.html).
-  Click on “Download map (ZIP)”, the polygon files are in
-  `/PRO/01_INST/Vegetationsfläche_vf/K4_polgYYYYMMDD_vf`; different
-  timestamps are available, the 2015 data used here stem from another
-  data set.
-- `input/g2*`: National (`s`) as well as cantonal borders (`k`) and
-  lakes (`l`). Available
-  [here](https://www.bfs.admin.ch/bfs/de/home/dienstleistungen/geostat/geodaten-bundesstatistik/administrative-grenzen/generalisierte-gemeindegrenzen.html).
-- (Hillshaded) relief: This is a freely available GeoTIFF from
-  [swisstopo](https://shop.swisstopo.admin.ch/en/products/maps/national/digital/srm1000).
-  For the sake of simplicity, it was converted to the “ESRI ASCII”
-  format using
-  `gdal_translate -of AAIGrid 02-relief-georef.tif 02-relief-ascii.asc`
-  on the CLI. The `raster` can read that format natively, without the
-  need of explicitly installing the `rgdal` package – which is not the
-  case for GeoTIFF files.
+> - `input/gde-1-1-15.*`: These geometries do not show the political
+>   borders of Swiss municipalities, but the so-called “productive”
+>   area, i.e., larger lakes and other “unproductive” areas such as
+>   mountains are excluded. This has two advantages: 1) The relatively
+>   sparsely populated but very large municipalities in the Alps don’t
+>   have too much visual weight and 2) it allows us to use the beautiful
+>   raster relief of the Alps as a background. These data are now freely
+>   available [from the
+>   FSO](https://www.bfs.admin.ch/bfs/en/home/statistics/regional-statistics/base-maps/cartographic-bases.assetdetail.7546178.html).
+>   Click on “Download map (ZIP)”, the polygon files are in
+>   `/PRO/01_INST/Vegetationsfläche_vf/K4_polgYYYYMMDD_vf`; different
+>   timestamps are available, the 2015 data used here stem from another
+>   data set.
+> - `input/g2*`: National (`s`) as well as cantonal borders (`k`) and
+>   lakes (`l`). Available
+>   [here](https://www.bfs.admin.ch/bfs/de/home/dienstleistungen/geostat/geodaten-bundesstatistik/administrative-grenzen/generalisierte-gemeindegrenzen.html).
 
-Now data prep that is appropriate for the ggregions methodology.
+Now we prep the data prep in a way that is appropriate for the ggregions
+methodology. We keep the name of the region as the 1st column, and any
+other region-identifying column of data that we might want to use,
+e.g. `aes(canton_num = my_canton_num_id_var)`. Critically geometry
+columns are preserved for drawing the regions. Note that
+`dplyr::select()` does not remove geometry even when the variable is not
+explicitly referenced.
 
 ``` r
 library(tidyverse)
@@ -173,11 +177,26 @@ country_geo <- read_sf("input/g2l15.shp") |>
 lake_geo <- read_sf("input/g2s15.shp") |>
   dplyr::select(lake_name = GMDNAME, lake_num = GMDNR)
 
-
 # read productive area (2324 municipalities)
 muni_prod_geo <- read_sf("input/gde-1-1-15.shp") |> 
-  dplyr::select(geometry, muni_name = Secondary_, muni_id = BFS_ID)
+  dplyr::select(muni_name = Secondary_, muni_id = BFS_ID, geometry)
+```
 
+### Mountain data
+
+Drawing the mountain data is not an sf object, and is a little
+different. First a bit on the source from the blog:
+
+> - (Hillshaded) relief: This is a freely available GeoTIFF from
+>   [swisstopo](https://shop.swisstopo.admin.ch/en/products/maps/national/digital/srm1000).
+>   For the sake of simplicity, it was converted to the “ESRI ASCII”
+>   format using
+>   `gdal_translate -of AAIGrid 02-relief-georef.tif 02-relief-ascii.asc`
+>   on the CLI. The `raster` can read that format natively, without the
+>   need of explicitly installing the `rgdal` package – which is not the
+>   case for GeoTIFF files.
+
+``` r
 library(raster)
 # read in raster of relief
 relief <- raster("input/02-relief-ascii.asc") %>%
@@ -192,7 +211,7 @@ relief <- raster("input/02-relief-ascii.asc") %>%
   mutate(value_point6_0 = 1 - value_point6_0 - .4)
 ```
 
-### we need to include it in the package
+### we need to include each of our prepared datasets in the package
 
 ``` r
 usethis::use_data(relief, overwrite = T)
@@ -202,7 +221,30 @@ usethis::use_data(lake_geo, overwrite = T)
 usethis::use_data(muni_prod_geo, overwrite = T)
 ```
 
+## `geom_*()` and `stamp_*()` functions using `ggregions::write_*(ref_data = ?)`
+
+Install {ggregions} if you don’t already have the package.
+
+``` r
+remotes::install_github("EvaMaeRey/ggregions")
+```
+
+Now we can prepare the geographic layer functions…
+
+``` r
+#' @export
+geom_muni <- ggregions::write_geom_region_locale(ref_data = muni_prod_geo)
+
+#' @export
+stamp_canton <- ggregions::write_stamp_region_locale(canton_geo)
+
+#' @export
+stamp_lake <- ggregions::write_stamp_region_locale(lake_geo)
+```
+
 ## `stamp_mountains()`
+
+Mountains have a bit different character, so we look at this separately.
 
 ``` r
 #' @export
@@ -216,30 +258,17 @@ stamp_relief <- function(...){
   
 }
 
+# I think there is something to be said for both names
 #' @export
 stamp_mountains <- stamp_relief
 ```
 
-## `geom_*()` and `stamp_*()` functions using `ggregions::write_*(ref_data = ?)`
-
-Install {ggregions} if you don’t already have the package.
-
-``` r
-remotes::install_github("EvaMaeRey/ggregions")
-```
-
-``` r
-#' @export
-geom_muni <- ggregions::write_geom_region_locale(ref_data = muni_prod_geo)
-
-#' @export
-stamp_canton <- ggregions::write_stamp_region_locale(canton_geo)
-
-#' @export
-stamp_lake <- ggregions::write_stamp_region_locale(lake_geo)
-```
-
 # packaging
+
+### code management
+
+We send our code to the .R folder for this package with
+`knitrExtra::chunk_to_dir()`
 
 ``` r
 knitrExtra::chunk_to_dir(
@@ -249,68 +278,30 @@ knitrExtra::chunk_to_dir(
   )
 ```
 
+### Document, check, install minimal package
+
 ``` r
 devtools::document(".")
 devtools::check(".")
 devtools::install(".", upgrade = "never")
 ```
 
-# Use ggswitzerland! A replication of Timo and Angelo’s work
+# Use ggswitzerland! A replication of Timo and Angelo’s mapping work (some data preparation that is demo-ed in the blog is saved in the csv.)
 
-## Data preparation (binning)
+## Basic Vizzing
 
-``` r
-remove(list = ls())
-
-data <- readr::read_csv("input/data.csv")
-
-head(data)
-#> # A tibble: 6 × 4
-#>   municipality       bfs_id  mean  gini
-#>   <chr>               <dbl> <dbl> <dbl>
-#> 1 Aeugst am Albis         1 56077 0.523
-#> 2 Affoltern am Albis      2 40365 0.434
-#> 3 Bonstetten              3 50364 0.415
-#> 4 Hausen am Albis         4 47717 0.47 
-#> 5 Hedingen                5 50436 0.453
-#> 6 Kappel am Albis         6 48833 0.484
-```
+### data to viz
 
 ``` r
-library(tidyverse)
-# define number of classes
-no_classes <- 6
+muni_income_data <- 
+  read_csv("input/muni_income_data.csv") 
 
-# extract quantiles
-quantiles <- data %>%
-  pull(mean) %>%
-  quantile(probs = seq(0, 1, length.out = 6 + 1)) %>%
-  as.vector() # to remove names of quantiles, so idx below is numeric
-
-# here we create custom labels
-labels <- imap_chr(quantiles, function(., idx){
-  return(paste0(round(quantiles[idx] / 1000, 0),
-                             "k",
-                             " – ",
-                             round(quantiles[idx + 1] / 1000, 0),
-                             "k"))
-})
-
-# we need to remove the last label 
-# because that would be something like "478k - NA"
-labels <- labels[1:length(labels) - 1]
-
-data <- data |> 
-  mutate(mean_quantiles = 
-         cut(mean,
-               breaks = quantiles,
-               labels = labels,
-               include.lowest = T))
-
-data |> head()
+# check that it's a flat file
+# i.e. geo references, but no boundary info
+head(muni_income_data)
 #> # A tibble: 6 × 5
 #>   municipality       bfs_id  mean  gini mean_quantiles
-#>   <chr>               <dbl> <dbl> <dbl> <fct>         
+#>   <chr>               <dbl> <dbl> <dbl> <chr>         
 #> 1 Aeugst am Albis         1 56077 0.523 47k – 478k    
 #> 2 Affoltern am Albis      2 40365 0.434 38k – 41k     
 #> 3 Bonstetten              3 50364 0.415 47k – 478k    
@@ -319,14 +310,14 @@ data |> head()
 #> 6 Kappel am Albis         6 48833 0.484 47k – 478k
 ```
 
-## Basic Vizzing
+### viz itself
 
 ``` r
 library(tidyverse)
 library(ggswitzerland)
 theme_map() |> theme_set()
 
-data |> 
+muni_income_data |>
   ggplot() + 
   stamp_mountains() + 
   aes(muni_name = municipality) +
@@ -336,7 +327,7 @@ data |>
   stamp_lake(fill = "#D6F1FF")
 ```
 
-<img src="README_files/figure-gfm/unnamed-chunk-8-1.png" width="100%" />
+<img src="README_files/figure-gfm/unnamed-chunk-9-1.png" width="100%" />
 
 ## A little more styling and labels.
 
@@ -350,7 +341,7 @@ default_caption <- paste0("Map CC-BY-SA; Code: ",
 ```
 
 ``` r
-data |> 
+muni_income_data |> 
   ggplot() + 
   stamp_mountains() + 
   aes(muni_name = municipality) +
@@ -371,7 +362,7 @@ data |>
        ) 
 ```
 
-<img src="README_files/figure-gfm/unnamed-chunk-10-1.png" width="100%" />
+<img src="README_files/figure-gfm/unnamed-chunk-11-1.png" width="100%" />
 
 Original:
 
@@ -384,7 +375,7 @@ Original:
 ``` r
 library(ggincerta) # for duo and scale_*_bivariate
 
-data |> 
+muni_income_data |> 
   ggplot() + 
   stamp_mountains() + 
   aes(muni_name = municipality) +
@@ -392,7 +383,7 @@ data |>
   aes(fill = duo(gini, mean))
 ```
 
-<img src="README_files/figure-gfm/unnamed-chunk-11-1.png" width="100%" />
+<img src="README_files/figure-gfm/unnamed-chunk-12-1.png" width="100%" />
 
 ``` r
 
@@ -400,7 +391,7 @@ last_plot() +
   scale_fill_bivariate(colors = c("darkred", "navy"))
 ```
 
-<img src="README_files/figure-gfm/unnamed-chunk-11-2.png" width="100%" />
+<img src="README_files/figure-gfm/unnamed-chunk-12-2.png" width="100%" />
 
 Original:
 

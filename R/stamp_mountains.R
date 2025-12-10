@@ -9,5 +9,6 @@ stamp_relief <- function(...){
   
 }
 
+# I think there is something to be said for both names
 #' @export
 stamp_mountains <- stamp_relief
