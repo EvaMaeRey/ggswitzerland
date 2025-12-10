@@ -1,5 +1,6 @@
 
 - [ggswitzerland](#ggswitzerland)
+- [Let’s go! Building {ggswitzerland}](#lets-go-building-ggswitzerland)
   - [`theme_map()`](#theme_map)
   - [data prep](#data-prep)
     - [we need to include it in the
@@ -8,9 +9,12 @@
   - [`geom_*()` and `stamp_*()` functions using
     `ggregions::write_*(ref_data = ?)`](#geom_-and-stamp_-functions-using-ggregionswrite_ref_data--)
 - [packaging](#packaging)
-- [Use ggswitzerland! A replication of Timo’s
-  work](#use-ggswitzerland-a-replication-of-timos-work)
-  - [A little more styling](#a-little-more-styling)
+- [Use ggswitzerland! A replication of Timo and Angelo’s
+  work](#use-ggswitzerland-a-replication-of-timo-and-angelos-work)
+  - [Data preparation (binning)](#data-preparation-binning)
+  - [Basic Vizzing](#basic-vizzing)
+  - [A little more styling and
+    labels.](#a-little-more-styling-and-labels)
 - [Bonus: {ggswitzerland} X
   {ggincerta}](#bonus-ggswitzerland-x-ggincerta)
 
@@ -18,34 +22,51 @@
 
 # ggswitzerland
 
-Is inspired and uses much of the code in ‘[Bivariate maps with ggplot2
-and
-sf](https://timogrossenbacher.ch/bivariate-maps-with-ggplot2-and-sf/)’
-with the source available in the
+What follows is inspired and uses much of the code in Timo Grossenbacher
+and Angelo Zehr’s ‘[Bivariate maps with ggplot2 and
+sf](https://timogrossenbacher.ch/bivariate-maps-with-ggplot2-and-sf/)’.
+The source for the blog post is available in the
 [repo](https://github.com/grssnbchr/bivariate-maps-ggplot2-sf?tab=readme-ov-file).
 
-The main goal is to be able to more succinctly create the following
-plot, using new layers (`geom_*()` and `stamp_*()` functions) that are
-defined in {ggswitzerland}. An original plot (not bivariate) from the
-blogpost:
+One of the plots, which is not actually a bivariate color plot so
+central to the post, is the target for a replication, and will informs
+what a minimal ggswitzerland might need in terms of functionality.
 
 ![](https://timogrossenbacher.ch/content/images/size/w1000/2023/07/bm-thematic-univariate-map-1.png)
-The novel functionality in {ggswitzerland} is `geom_muni()` which can be
-used to create a map from flat data (no boundary information). Creating
-functions like `geom_muni()` can be done easily using the {ggregions}
-package.
+
+{ggswitzerland}‘s `geom_*()`, `stamp_*()`, and `theme_*()` functions
+will allow us to *not only* ’write down’ this plot in more succinctly,
+but arguably also in a way that better matches how we think about how to
+construct the map.
+
+Specifically, we can use data that has geographic information, *but no
+boundary information*, to construct our plot. If we have a dataset with
+municipality names and income level, for example, we can specify it as
+follows:
 
 ``` r
-flat_income_data |> # no boundary data is included
+flat_income_data |> # data frame with 
   ggplot() +
   aes(muni_name = municipality,
       fill = income_levels) + 
   geom_muni()     # knows municipality boundaries
 ```
 
+Creating functions like `geom_muni()` can be done easily using the
+{ggregions} package. In the background, `geom_muni()` performs a join
+with geo-referenced data so that the flat data can be represented on the
+map.
+
 Annotation layers `stamp_relief()` (and alias `stamp_mountains()`) as
 well as `stamp_lake()` and `stamp_canton()` are also specified to allow
 the map to be fully reproduced.
+
+For ease and consistency, geom\_ and stamp\_ functions are created with
+‘utilities’ from the *ggregions* package.
+
+# Let’s go! Building {ggswitzerland}
+
+Now it’s time to craft some functions!
 
 ## `theme_map()`
 
@@ -234,7 +255,9 @@ devtools::check(".")
 devtools::install(".", upgrade = "never")
 ```
 
-# Use ggswitzerland! A replication of Timo’s work
+# Use ggswitzerland! A replication of Timo and Angelo’s work
+
+## Data preparation (binning)
 
 ``` r
 remove(list = ls())
@@ -296,6 +319,8 @@ data |> head()
 #> 6 Kappel am Albis         6 48833 0.484 47k – 478k
 ```
 
+## Basic Vizzing
+
 ``` r
 library(tidyverse)
 library(ggswitzerland)
@@ -313,7 +338,7 @@ data |>
 
 <img src="README_files/figure-gfm/unnamed-chunk-8-1.png" width="100%" />
 
-## A little more styling
+## A little more styling and labels.
 
 ``` r
 default_caption <- paste0("Map CC-BY-SA; Code: ",
@@ -337,14 +362,7 @@ data |>
   stamp_lake(fill = "#D6F1FF", color = "transparent") + 
   theme_map() + 
   scale_fill_viridis_d(begin = .1, end = .9,
-                       option = "magma")
-```
-
-<img src="README_files/figure-gfm/unnamed-chunk-10-1.png" width="100%" />
-
-``` r
-
-last_plot() +
+                       option = "magma") +
   labs(x = NULL,  y = NULL,
        fill = "Average\nincome in CHF",
        title = "Switzerland's regional income",
@@ -353,7 +371,7 @@ last_plot() +
        ) 
 ```
 
-<img src="README_files/figure-gfm/unnamed-chunk-10-2.png" width="100%" />
+<img src="README_files/figure-gfm/unnamed-chunk-10-1.png" width="100%" />
 
 Original:
 
