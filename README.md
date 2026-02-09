@@ -1,7 +1,6 @@
 
 - [ggswitzerland](#ggswitzerland)
 - [Let’s go! Building {ggswitzerland}](#lets-go-building-ggswitzerland)
-  - [`theme_map()`](#theme_map)
   - [data prep](#data-prep)
     - [Mountain data](#mountain-data)
     - [we need to include each of our prepared datasets in the
@@ -13,11 +12,11 @@
   - [code management](#code-management)
   - [Document, check, install minimal
     package](#document-check-install-minimal-package)
-- [Use ggswitzerland! A replication of Timo and Angelo’s mapping work
-  (some data preparation that is demo-ed in the blog is saved in the
-  csv.)](#use-ggswitzerland-a-replication-of-timo-and-angelos-mapping-work-some-data-preparation-that-is-demo-ed-in-the-blog-is-saved-in-the-csv)
-  - [Basic Vizzing](#basic-vizzing)
-    - [data to viz](#data-to-viz)
+  - [Use ggswitzerland! A replication of Timo and Angelo’s mapping work
+    (some data preparation that is demo-ed in the blog is saved in the
+    csv.)](#use-ggswitzerland-a-replication-of-timo-and-angelos-mapping-work-some-data-preparation-that-is-demo-ed-in-the-blog-is-saved-in-the-csv)
+    - [Basic Vizzing](#basic-vizzing)
+  - [`theme_map()`](#theme_map)
     - [viz itself](#viz-itself)
   - [A little more styling and
     labels.](#a-little-more-styling-and-labels)
@@ -74,62 +73,6 @@ For ease and consistency, geom\_ and stamp\_ functions are created with
 
 Now it’s time to craft some functions!
 
-## `theme_map()`
-
-This is pretty much verbatim from Timo and Angelo’s blog, but *does* add
-palette definitions, a capability new in ggplot2 4.0.0. We use ‘magma’
-since it looks great in the target plot and is colorblind friendly!
-
-``` r
-#' @export
-theme_map <- function(...) {
-  theme_minimal() +
-  theme(
-    palette.fill.continuous = "magma",
-    palette.fill.discrete = "magma",
-    palette.fill.binned = "magma",
-    palette.color.continuous = "magma",
-    palette.color.discrete = "magma",
-    palette.color.binned = "magma",
-    text = element_text(color = "#4e4d47"),
-    axis.line = element_blank(),
-    axis.text.x = element_blank(),
-    axis.text.y = element_blank(),
-    axis.ticks = element_blank(),
-    panel.grid.major = element_line(color = "#dbdbd9", size = 0.2),
-    panel.grid.minor = element_blank(),
-    plot.background = element_rect(fill = "#f5f5f2",
-                                   color = NA),
-    panel.background = element_rect(fill = "#f5f5f2",
-                                    color = NA),
-    legend.background = element_rect(fill = "#f5f5f2",
-                                     color = NA),
-    plot.margin = unit(c(.5, .5, .2, .5), "cm"),
-    panel.border = element_blank(),
-    panel.spacing = unit(c(-.1, 0.2, .2, 0.2), "cm"),
-    legend.title = element_text(size = 11),
-    legend.text = element_text(size = 9, hjust = 0,
-                               color = "#4e4d47"),
-    plot.title = element_text(size = 15, hjust = 0.5,
-                              color = "#4e4d47"),
-    plot.subtitle = element_text(size = 10, hjust = 0.5,
-                                 color = "#4e4d47",
-                                 margin = margin(b = -0.1,
-                                                 t = -0.1,
-                                                 l = 2,
-                                                 unit = "cm"),
-                                 debug = F),
-    plot.caption = element_text(size = 7,
-                                hjust = .5,
-                                margin = margin(t = 0.2,
-                                                b = 0,
-                                                unit = "cm"),
-                                color = "#939184"),
-    ...
-  )
-}
-```
-
 ## data prep
 
 Here’s some info about the data provinance, verbatim from the blog.
@@ -165,6 +108,7 @@ explicitly referenced.
 
 ``` r
 library(tidyverse)
+library(sf)
 # read cantonal borders
 canton_geo <- read_sf("input/g2k15.shp") |>
   dplyr::select(canton_name = KTNAME, canton_num = KTNR)
@@ -286,15 +230,15 @@ devtools::check(".")
 devtools::install(".", upgrade = "never")
 ```
 
-# Use ggswitzerland! A replication of Timo and Angelo’s mapping work (some data preparation that is demo-ed in the blog is saved in the csv.)
+## Use ggswitzerland! A replication of Timo and Angelo’s mapping work (some data preparation that is demo-ed in the blog is saved in the csv.)
 
-## Basic Vizzing
+### Basic Vizzing
 
-### data to viz
+#### data to viz
 
 ``` r
 muni_income_data <- 
-  read_csv("input/muni_income_data.csv") 
+  readr::read_csv("input/muni_income_data.csv") 
 
 # check that it's a flat file
 # i.e. geo references, but no boundary info
@@ -310,11 +254,101 @@ head(muni_income_data)
 #> 6 Kappel am Albis         6 48833 0.484 47k – 478k
 ```
 
+``` r
+usethis::use_data(muni_income_data, overwrite = T)
+```
+
+## `theme_map()`
+
+This is pretty much verbatim from Timo and Angelo’s blog, but *does* add
+palette definitions, a capability new in ggplot2 4.0.0. We use ‘magma’
+since it looks great in the target plot and is colorblind friendly!
+
+<details>
+
+<summary>
+
+theme_map details
+</summary>
+
+``` r
+
+vary_viridis <- function(alpha = 1, begin = 0, end = 1, 
+                         direction = 1, option = "D", mix = "white", 
+                         amount = 0){
+  
+  scales::pal_viridis(alpha = alpha, begin = begin, end = end, 
+              direction = direction, option = option)(6) |> 
+    scales::col_mix(b = mix, amount = amount) |>
+    scales::pal_gradient_n(values = NULL, space = "Lab")
+  
+}
+
+magma_mod <- vary_viridis(begin = .1, end = .9, option = "magma", alpha = .8)
+
+# library(scales)
+# magma_mod <- pal_gradient_n(pal_viridis(alpha = .9,
+#         begin = 0, end = .95, direction = 1, option = "D")(6) |> scales::col_mix("lightyellow", .4), values = NULL, space = "Lab")
+
+
+
+#' @export
+theme_map <- function(...) {
+  theme_minimal() +
+  theme(
+    palette.fill.continuous = magma_mod,
+    palette.fill.discrete = magma_mod,
+    palette.fill.binned = magma_mod,
+    palette.color.continuous = magma_mod,
+    palette.color.discrete = magma_mod,
+    palette.color.binned = magma_mod,
+    text = element_text(color = "#4e4d47"),
+    axis.line = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks = element_blank(),
+    panel.grid.major = element_line(color = "#dbdbd9", size = 0.2),
+    panel.grid.minor = element_blank(),
+    plot.background = element_rect(fill = "#f5f5f2",
+                                   color = NA),
+    panel.background = element_rect(fill = "#f5f5f2",
+                                    color = NA),
+    legend.background = element_rect(fill = "#f5f5f2",
+                                     color = NA),
+    plot.margin = unit(c(.5, .5, .2, .5), "cm"),
+    panel.border = element_blank(),
+    panel.spacing = unit(c(-.1, 0.2, .2, 0.2), "cm"),
+    legend.title = element_text(size = 11),
+    legend.text = element_text(size = 9, hjust = 0,
+                               color = "#4e4d47"),
+    plot.title = element_text(size = 15, hjust = 0.5,
+                              color = "#4e4d47"),
+    plot.subtitle = element_text(size = 10, hjust = 0.5,
+                                 color = "#4e4d47",
+                                 margin = margin(b = -0.1,
+                                                 t = -0.1,
+                                                 l = 2,
+                                                 unit = "cm"),
+                                 debug = F),
+    plot.caption = element_text(size = 7,
+                                hjust = .5,
+                                margin = margin(t = 0.2,
+                                                b = 0,
+                                                unit = "cm"),
+                                color = "#939184"),
+    ...
+  )
+}
+```
+
+</details>
+
 ### viz itself
 
 ``` r
 library(tidyverse)
 library(ggswitzerland)
+
 theme_map() |> theme_set()
 
 muni_income_data |>
@@ -327,7 +361,7 @@ muni_income_data |>
   stamp_lake(fill = "#D6F1FF")
 ```
 
-<img src="README_files/figure-gfm/unnamed-chunk-9-1.png" width="100%" />
+<img src="README_files/figure-gfm/unnamed-chunk-10-1.png" width="100%" />
 
 ## A little more styling and labels.
 
@@ -345,12 +379,13 @@ muni_income_data |>
   ggplot() + 
   stamp_mountains() + 
   aes(muni_name = municipality) +
-  geom_muni(alpha = .8, color = "lightgrey") +
+  geom_muni(color = "lightgrey" |> alpha(.8)) +
   aes(fill = mean_quantiles) +
   stamp_canton(fill = "transparent", 
                color = "whitesmoke", 
                linewidth = .5) + 
-  stamp_lake(fill = "#D6F1FF", color = "transparent") + 
+  stamp_lake(fill = "#D6F1FF", 
+             color = "transparent") + 
   theme_map() + 
   scale_fill_viridis_d(begin = .1, end = .9,
                        option = "magma") +
@@ -362,7 +397,7 @@ muni_income_data |>
        ) 
 ```
 
-<img src="README_files/figure-gfm/unnamed-chunk-11-1.png" width="100%" />
+<img src="README_files/figure-gfm/unnamed-chunk-12-1.png" width="100%" />
 
 Original:
 
@@ -383,7 +418,7 @@ muni_income_data |>
   aes(fill = duo(gini, mean))
 ```
 
-<img src="README_files/figure-gfm/unnamed-chunk-12-1.png" width="100%" />
+<img src="README_files/figure-gfm/unnamed-chunk-13-1.png" width="100%" />
 
 ``` r
 
@@ -391,7 +426,7 @@ last_plot() +
   scale_fill_bivariate(colors = c("darkred", "navy"))
 ```
 
-<img src="README_files/figure-gfm/unnamed-chunk-12-2.png" width="100%" />
+<img src="README_files/figure-gfm/unnamed-chunk-13-2.png" width="100%" />
 
 Original:
 

@@ -1,13 +1,33 @@
+
+vary_viridis <- function(alpha = 1, begin = 0, end = 1, 
+                         direction = 1, option = "D", mix = "white", 
+                         amount = 0){
+  
+  scales::pal_viridis(alpha = alpha, begin = begin, end = end, 
+              direction = direction, option = option)(6) |> 
+    scales::col_mix(b = mix, amount = amount) |>
+    scales::pal_gradient_n(values = NULL, space = "Lab")
+  
+}
+
+magma_mod <- vary_viridis(begin = .1, end = .9, option = "magma", alpha = .8)
+
+# library(scales)
+# magma_mod <- pal_gradient_n(pal_viridis(alpha = .9,
+#         begin = 0, end = .95, direction = 1, option = "D")(6) |> scales::col_mix("lightyellow", .4), values = NULL, space = "Lab")
+
+
+
 #' @export
 theme_map <- function(...) {
   theme_minimal() +
   theme(
-    palette.fill.continuous = "magma",
-    palette.fill.discrete = "magma",
-    palette.fill.binned = "magma",
-    palette.color.continuous = "magma",
-    palette.color.discrete = "magma",
-    palette.color.binned = "magma",
+    palette.fill.continuous = magma_mod,
+    palette.fill.discrete = magma_mod,
+    palette.fill.binned = magma_mod,
+    palette.color.continuous = magma_mod,
+    palette.color.discrete = magma_mod,
+    palette.color.binned = magma_mod,
     text = element_text(color = "#4e4d47"),
     axis.line = element_blank(),
     axis.text.x = element_blank(),
